@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import Web3 from "web3";
 import { nanoid } from "nanoid";
 import { create } from "ipfs-http-client";
@@ -9,17 +9,15 @@ import StepLabel from '@mui/material/StepLabel';
 import Button from '@mui/material/Button';
 import Typography from '@mui/material/Typography';
 import { Input, Paper, TextField } from "@mui/material";
-import InputFileUpload from "../components/InputFileUpload";
 import { useNavigate } from "react-router-dom";
 import { MyContractAddress } from "../MyContractABI";
 
 const steps = ['Basic Details', 'Proof Document', 'Finish'];
 
 const Register = () => {
-    const [web3, setWeb3] = useState(null);
-    const [userAddress, setUserAddress] = useState('');
+    // const [userAddress, setUserAddress] = useState('');
     // const [contract, setContract] = useState(null);
-    const [result, setResult] = useState('');
+    // const [result, setResult] = useState('');
     const [username, setUsername] = useState('')
     const [password, setPassword] = useState('')
     const [ipfsHash, setIpfsHash] = useState('');
@@ -28,23 +26,6 @@ const Register = () => {
     const [selectedImage, setSelectedImage] = useState(null);
 
     const navigate = useNavigate()
-  
-    useEffect(() => {
-      if (typeof window.ethereum !== 'undefined') {
-        const web3Instance = new Web3(window.ethereum);
-        window.ethereum.enable()
-          .then(function (accounts) {
-            setUserAddress(accounts[0]);
-            setWeb3(web3Instance);
-            // setContract(new web3Instance.eth.Contract(contractABI, contractAddress));
-          })
-          .catch(function (error) {
-            console.error('Error enabling Ethereum:', error);
-          });
-      } else {
-        console.error('MetaMask or a similar Web3 provider is not installed');
-      }
-    }, []);
 
     const setUser = () => {
       setUsername(document.getElementById('username').value)

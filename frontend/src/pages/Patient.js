@@ -1,11 +1,6 @@
-import Web3 from "web3";
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useEffect } from "react";
-import { MyContractAddress,
-    setParameterABI, 
-    getParameterABI 
-} from "../MyContractABI";
 import NavBarVertical from "../components/NavBarVertical";
 import Icon from '@mdi/react';
 import { mdiAccountCircle } from '@mdi/js';
@@ -28,7 +23,6 @@ const Patient = () => {
         (() => {
             if(!localStorage.getItem("Patient_id")){
                 navigate("/")
-                // 9bc26013865549908d4ad4b2978962d9fioa864b
             }
         })()
     })

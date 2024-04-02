@@ -1,6 +1,6 @@
 import Web3 from "web3";
 import { MyContractAddress, getParameterABI, setParameterABI } from "../MyContractABI";
-import { Fragment, useEffect, useState } from "react";
+import { useEffect, useState } from "react";
 import { Card, CardContent, Typography } from '@mui/material'
 import Button from "@mui/joy/Button";
 

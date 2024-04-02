@@ -1,13 +1,9 @@
-import { useState, useEffect } from "react";
+import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import {
-  MyContractAddress,
-  setParameterABI,
-  getParameterABI,
-} from "../MyContractABI";
 import { Button } from "@mui/joy";
 import NavBarVertical from "../components/NavBarVertical";
 import Icon from "@mdi/react";
+import { Modal } from 'bootstrap'
 import { mdiAccountCircle } from "@mdi/js";
 import Avatar from "@mui/material/Avatar";
 import Menu from "@mui/material/Menu";
@@ -18,19 +14,138 @@ import Logout from "@mui/icons-material/Logout";
 import Record from "../components/Record";
 import Data from "../components/Data";
 import Prediction from "../components/Prediction";
-import { faceio } from "../FaceAuth";
+import * as faceapi from 'face-api.js'
+// import { faceio } from "../FaceAuth";
 
 const DoctorPortal = () => {
   const [activeComponent, setActiveComponent] = useState("Records");
   const [anchorEl, setAnchorEl] = useState(null);
+  const [hasPatient, setHasPatient] = useState(true)
+  const [video, setVideo] = useState(null);
+
   const navigate = useNavigate();
 
-  const handleAuth = () => {
-    faceio.authenticate({ locale: "auto" }).then((userData) => {
-      localStorage.setItem("PatientD_id", userData.facialId);
-      console.log("Success, user identified");
-      console.log("Linked facial Id: " + userData.facialId);
+  useEffect(() => {
+    (async function() {
+      try{
+        await Promise.all([
+            faceapi.nets.tinyFaceDetector.loadFromUri('/models'),
+            faceapi.nets.faceLandmark68Net.loadFromUri('/models'),
+            faceapi.nets.faceRecognitionNet.loadFromUri('/models'),
+            faceapi.nets.ssdMobilenetv1.loadFromUri('/models')
+        ]);
+      }
+    catch(err){
+      console.log(err)
+    }})()
+  })
+
+  let v = document.getElementById("myVideo");
+
+  const takeSnapshot = async () => {
+    const canvas = document.createElement('canvas');
+    const ctx = canvas.getContext('2d');
+    canvas.width = v.videoWidth;
+    canvas.height = v.videoHeight;
+    ctx.drawImage(v, 0, 0, canvas.width, canvas.height);
+
+    const dataUrl = canvas.toDataURL('image/png');
+
+    console.log(dataUrl)
+
+    return dataUrl;
+  };
+
+  const detectFace = (v) => {
+    return faceapi.detectSingleFace(v);
+  };
+    
+  const stopMediaTracks = (stream) => {
+    const tracks = stream.getTracks();
+    tracks.forEach(track => {
+      track.stop();
     });
+  };
+
+  const handleAuth = async () => {
+    try {
+      const signUpModalElement = document.getElementById("signUpModal");
+      const signUpModal = new Modal(signUpModalElement);
+  
+      navigator.mediaDevices.getUserMedia({ video: { width: 250, height: 250 }, audio: false })
+        .then(stream => {
+          setVideo(stream);
+          if (!v) {
+            throw new Error("Video element not found");
+          }
+          v.srcObject = stream;
+  
+          // Wait for the modal to show
+          return new Promise(resolve => {
+            signUpModalElement.addEventListener('shown.bs.modal', resolve, { once: true });
+            signUpModal.show();
+          });
+        })
+        .then(() => {
+          // Once modal is shown, start face detection
+          detectFace(v)
+            .then(detections => {
+              if (detections && detections.score > 0.1) {
+                console.log("Face detected");
+                takeSnapshot()
+                  .then(snapshot => {
+                    signUpModal.hide();
+                    const stream = v.srcObject;
+                    stopMediaTracks(stream);
+                    callYourAPI('', snapshot, 'http://localhost:5000/authenticate')
+                    .then(data => {
+                      if(data.fingerprint){
+                        console.log(data)
+                        localStorage.setItem('patient_Id', data.fingerprint)
+                        navigate('/Patient')
+                      }
+                    })
+                  })
+                  .catch(error => {
+                    console.error("Error taking snapshot:", error);
+                  });
+              } else {
+                // Handle case where face is not detected
+                console.log("No face detected");
+                signUpModal.hide();
+                const stream = v.srcObject;
+                stopMediaTracks(stream);
+              }
+            })
+            .catch(error => {
+              console.error("Face detection error:", error);
+            });
+        })
+        .catch(error => {
+          console.error("Error during face detection:", error);
+        });
+    } catch (error) {
+      console.error("Error during face detection:", error);
+    }
+  };
+
+  const callYourAPI = async (name, imageData, url) => {
+    try {
+      const response = await fetch(url, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          name: name,
+          image: imageData
+        }),
+      });
+      const data = await response.json();
+      return data;
+    } catch (err) {
+        console.error('Error calling API:', err);
+    }
   };
 
   const open = Boolean(anchorEl);
@@ -42,6 +157,11 @@ const DoctorPortal = () => {
   const handleClose = () => {
     setAnchorEl(null);
   };
+
+  const clearPatient = () => {
+    localStorage.removeItem('PatientD_id')
+    setHasPatient(true)
+  }
 
   const handleLogOut = () => {
     localStorage.clear();
@@ -59,6 +179,9 @@ const DoctorPortal = () => {
                 <div className="me-5 mt-2">
                   <Button onClick={handleAuth} variant="outlined">
                     Get Patient
+                  </Button>
+                  <Button onClick={clearPatient} variant="outlined" color="danger" disabled={hasPatient} className="ms-3">
+                    Clear
                   </Button>
                 </div>
                 <div className="nav-hor-acc" onClick={handleClick}>
@@ -152,6 +275,26 @@ const DoctorPortal = () => {
           Logout
         </MenuItem>
       </Menu>
+      <div className="modal fade" id="signUpModal" tabIndex="-1" aria-labelledby="signUpModalLabel" aria-hidden="true" >
+        <div className="modal-dialog modal-dialog-centered modal-lg">
+          <div className="modal-content">
+            <div className="modal-header">
+              <h1 className="modal-title fs-5" id="exampleModalLabel">Facial Authentication</h1>
+              
+            </div>
+            <div className="modal-body">
+              <div id ="camera-input" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center'}}>        
+                  <div id ="face-input">
+                      <video id="myVideo"  autoPlay></video>
+                  </div>
+              </div>
+            </div>
+            <div className="modal-footer">
+              
+            </div>
+          </div>
+        </div>
+      </div>
     </>
   );
 };

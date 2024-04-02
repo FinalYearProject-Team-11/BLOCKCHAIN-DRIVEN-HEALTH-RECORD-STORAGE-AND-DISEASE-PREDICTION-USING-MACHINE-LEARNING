@@ -1,5 +1,4 @@
-import { useEffect, useState } from 'react'
-import faceIO from '@faceio/fiojs'
+import { useEffect, useState, useRef } from 'react'
 import '../styles.sass'
 import { Modal } from 'bootstrap'
 import { Link, useNavigate } from 'react-router-dom'
@@ -9,8 +8,9 @@ import { Button, Box, TextField, Divider, Collapse } from '@mui/material'
 import Typography from '@mui/material/Typography';
 import Web3 from "web3";
 import { MyContractAddress } from '../MyContractABI'
-import LandingCard from '../components/Card'
 import { faceio } from '../FaceAuth'
+import * as faceapi from 'face-api.js'
+import axios from 'axios'
 
 const Landing = () => {
 
@@ -19,12 +19,30 @@ const Landing = () => {
   const [name, setName] = useState('');
   const [password, setPassword] = useState('');
   const [checked, setChecked] = useState(false);
+  const [video, setVideo] = useState(null);
+  const [snapshot, setSnapshot] = useState(null);
+
+
+  const intervalRef = useRef(null);
+
+  let v = document.getElementById("myVideo");
 
   const navigate = useNavigate()
   useEffect(() => {
-    (function(){
+    (async function(){
       if(localStorage.getItem("Patient_id")){
         navigate("/Patient")
+      }
+      try{
+        await Promise.all([
+            faceapi.nets.tinyFaceDetector.loadFromUri('/models'),
+            faceapi.nets.faceLandmark68Net.loadFromUri('/models'),
+            faceapi.nets.faceRecognitionNet.loadFromUri('/models'),
+            faceapi.nets.ssdMobilenetv1.loadFromUri('/models')
+        ]);
+      }
+      catch(err){
+        console.log(err)
       }
     })()
     
@@ -39,7 +57,7 @@ const Landing = () => {
     alert()
 
     setChecked(true)
-  })
+  }, [setChecked, navigate])
 
   const handleDocClick = () => {
       if(!dShow){
@@ -55,21 +73,226 @@ const Landing = () => {
     }
   }
 
-  const handleSubmit = () => {
+  const takeSnapshot = async () => {
+    const canvas = document.createElement('canvas');
+    const ctx = canvas.getContext('2d');
+    canvas.width = v.videoWidth;
+    canvas.height = v.videoHeight;
+    ctx.drawImage(v, 0, 0, canvas.width, canvas.height);
 
-  }
+    const dataUrl = canvas.toDataURL('image/png');
 
-  async function handlePatientReg() {
-      faceio.enroll({
-        "locale": "auto"
-        }).then(userInfo => {
-           console.log(userInfo);
-           handlePL(userInfo)
-        }).catch(errCode => {
-          //  handleError(errCode);
+    console.log(dataUrl)
+
+    return dataUrl;
+  };
+
+  // const startFaceDetection = async () => {
+  //   try {
+  //     const signUpModalElement = document.getElementById("signUpModal");
+  //     const signUpModal = new Modal(signUpModalElement);
+  //     const stream = await navigator.mediaDevices.getUserMedia({ video: { width: 250, height: 250 }, audio: false });
+  //     setVideo(stream);
+
+  //     signUpModalElement.addEventListener('shown.bs.modal', async () => {
+  //       try {
+  //         v.srcObject = stream;
+  //         intervalRef.current = setInterval(async () => {
+  //           const detections = await faceapi.detectSingleFace(v);
+  //           if (detections && detections.score > 0.5) {
+  //             console.log("Face detected");
+  //             clearInterval(intervalRef.current);
+  //             const snapshot = await takeSnapshot();
+  //             const tracks = stream.getTracks(); // Get the tracks array
+  //             tracks.forEach(track => { // Iterate over the tracks array
+  //               track.stop();
+  //             });
+  //             signUpModal.hide();
+  //             callYourAPI('Placeholder', snapshot, 'http://localhost:5000/register')
+  //           }
+  //         }, 100);
+  //       } catch (err) {
+  //         console.log('navigator.getUserMedia error: ', err);
+  //       }
+  //     });
+
+  //     signUpModalElement.addEventListener('hidden.bs.modal', () => {
+  //       const tracks = stream.getTracks(); // Get the tracks array
+  //       tracks.forEach(track => { // Iterate over the tracks array
+  //         track.stop();
+  //       });
+  //       clearInterval(intervalRef.current);
+  //       document.body.classList.remove('modal-open');
+  //     });
+
+  //     signUpModal.show();
+  //   } catch (error) {
+  //     console.error("Error during face detection:", error);
+  //   }
+  // };
+
+  const startFaceDetection = () => {
+    try {
+      const signUpModalElement = document.getElementById("signUpModal");
+      const signUpModal = new Modal(signUpModalElement);
+  
+      navigator.mediaDevices.getUserMedia({ video: { width: 250, height: 250 }, audio: false })
+        .then(stream => {
+          setVideo(stream);
+          if (!v) {
+            throw new Error("Video element not found");
+          }
+          v.srcObject = stream;
+  
+          // Wait for the modal to show
+          return new Promise(resolve => {
+            signUpModalElement.addEventListener('shown.bs.modal', resolve, { once: true });
+            signUpModal.show();
+          });
         })
-      }
+        .then(() => {
+          // Once modal is shown, start face detection
+          detectFace(v)
+            .then(detections => {
+              if (detections && detections.score > 0.1) {
+                console.log("Face detected");
+                takeSnapshot()
+                  .then(snapshot => {
+                    signUpModal.hide();
+                    const stream = v.srcObject;
+                    stopMediaTracks(stream);
+                    callYourAPI('Placeholder', snapshot, 'http://localhost:5000/register')
+                    .then(data => {
+                      console.log(data)
+                      handlePL({
+                        facialId: data.fingerprint
+                      })
+                      navigate('/')
+                    })
+                  })
+                  .catch(error => {
+                    console.error("Error taking snapshot:", error);
+                  });
+              } else {
+                // Handle case where face is not detected
+                console.log("No face detected");
+                signUpModal.hide();
+                const stream = v.srcObject;
+                stopMediaTracks(stream);
+              }
+            })
+            .catch(error => {
+              console.error("Face detection error:", error);
+            });
+        })
+        .catch(error => {
+          console.error("Error during face detection:", error);
+        });
+    } catch (error) {
+      console.error("Error during face detection:", error);
+    }
+  };
+  
+  const detectFace = (v) => {
+    return faceapi.detectSingleFace(v);
+  };
+    
+  const stopMediaTracks = (stream) => {
+    const tracks = stream.getTracks();
+    tracks.forEach(track => {
+      track.stop();
+    });
+  };
+  
+  const startFaceDetectionLogin = async () => {
+    try {
+      const signUpModalElement = document.getElementById("signUpModal");
+      const signUpModal = new Modal(signUpModalElement);
+  
+      navigator.mediaDevices.getUserMedia({ video: { width: 250, height: 250 }, audio: false })
+        .then(stream => {
+          setVideo(stream);
+          if (!v) {
+            throw new Error("Video element not found");
+          }
+          v.srcObject = stream;
+  
+          // Wait for the modal to show
+          return new Promise(resolve => {
+            signUpModalElement.addEventListener('shown.bs.modal', resolve, { once: true });
+            signUpModal.show();
+          });
+        })
+        .then(() => {
+          // Once modal is shown, start face detection
+          detectFace(v)
+            .then(detections => {
+              if (detections && detections.score > 0.1) {
+                console.log("Face detected");
+                takeSnapshot()
+                  .then(snapshot => {
+                    signUpModal.hide();
+                    const stream = v.srcObject;
+                    stopMediaTracks(stream);
+                    callYourAPI('', snapshot, 'http://localhost:5000/authenticate')
+                    .then(data => {
+                      if(data.fingerprint){
+                        console.log(data)
+                        localStorage.setItem('Patient_id', data.fingerprint)
+                        navigate('/Patient')
+                      }
+                    })
+                  })
+                  .catch(error => {
+                    console.error("Error taking snapshot:", error);
+                  });
+              } else {
+                // Handle case where face is not detected
+                console.log("No face detected");
+                signUpModal.hide();
+                const stream = v.srcObject;
+                stopMediaTracks(stream);
+              }
+            })
+            .catch(error => {
+              console.error("Face detection error:", error);
+            });
+        })
+        .catch(error => {
+          console.error("Error during face detection:", error);
+        });
+    } catch (error) {
+      console.error("Error during face detection:", error);
+    }
+  };
 
+  const callYourAPI = async (name, imageData, url) => {
+    try {
+      const response = await fetch(url, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          name: name,
+          image: imageData
+        }),
+      });
+      const data = await response.json();
+      return data;
+    } catch (err) {
+        console.error('Error calling API:', err);
+    }
+  };
+
+  const closeVideo = async () => {
+    console.log(video)
+    const tracks = video.getTracks();
+    tracks.forEach(track => {
+      track.stop()
+    });
+  };
+  
   const handlePL = async (data) => {
     try {
     if (window.ethereum) {
@@ -166,7 +389,7 @@ const Landing = () => {
             ],
             "stateMutability": "view",
             "type": "function",
-            "constant": true
+            "constant": "true"
           }
         ];
   
@@ -276,7 +499,6 @@ const Landing = () => {
             display: 'flex',
             justifyContent: 'center',
             alignItems: 'center',
-            // WebkitMask: 'linear-gradient(90deg, #000000, transparent)',
           }}
         >
           <Container sx={{
@@ -379,7 +601,7 @@ const Landing = () => {
                           justifyContent: 'center',
                           paddingTop: '20px'
                         }}>
-                          <Button onClick={handleAuth} variant='outlined' >Login</Button>
+                          <Button onClick={startFaceDetectionLogin} variant='outlined' >Login</Button>
                         </Box>
                         <Divider>
                           or
@@ -389,7 +611,7 @@ const Landing = () => {
                           justifyContent: 'center',
                           paddingTop: '20px'
                         }} >
-                          <Button variant='contained' onClick={handlePatientReg}>
+                          <Button variant='contained' onClick={startFaceDetection}>
                             Register
                           </Button>
                         </Box>
@@ -413,6 +635,26 @@ const Landing = () => {
             </div>
             <div className="modal-footer">
               <button type="button" className="btn btn-danger" data-bs-dismiss="modal">Close</button>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div className="modal fade" id="signUpModal" tabIndex="-1" aria-labelledby="signUpModalLabel" aria-hidden="true" >
+        <div className="modal-dialog modal-dialog-centered modal-lg">
+          <div className="modal-content">
+            <div className="modal-header">
+              <h1 className="modal-title fs-5" id="exampleModalLabel">Facial Authentication</h1>
+              
+            </div>
+            <div className="modal-body">
+              <div id ="camera-input" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center'}}>        
+                  <div id ="face-input">
+                      <video id="myVideo"  autoPlay></video>
+                  </div>
+              </div>
+            </div>
+            <div className="modal-footer">
+              
             </div>
           </div>
         </div>

@@ -17,6 +17,7 @@ contract MyContract {
         int64 age;
         string[] recName;
         string[] documentHashes;
+        string summary;
     }
 
     struct Parameters {
@@ -76,6 +77,10 @@ contract MyContract {
         diseaseData[patientID] = temp2;
         emit PatientEnrolled(patientID, name);
     }
+
+    function addSummaryToPatient(string memory patientID, string memory summary) public {
+        patientData[patientID].summary = summary;
+    } 
 
     function initializeDefaultParameters() internal pure returns (Parameters memory) {
     return Parameters({ 
@@ -186,9 +191,9 @@ contract MyContract {
         return true;
     }
 
-    function getPatient(string memory patientID) public view returns (address patAddress, string memory name, int64 age, string[] memory recName, string[] memory documentHash) {
+    function getPatient(string memory patientID) public view returns (address patAddress, string memory name, int64 age, string[] memory recName, string[] memory documentHash, string memory summary) {
         require(bytes(patientID).length > 0, "Doctor id is required");
-        return (patientData[patientID].patAddress, patientData[patientID].name, patientData[patientID].age, patientData[patientID].recName, patientData[patientID].documentHashes);
+        return (patientData[patientID].patAddress, patientData[patientID].name, patientData[patientID].age, patientData[patientID].recName, patientData[patientID].documentHashes, patientData[patientID].summary);
     }
 
     function getUnauthenticatedDoctorsIds() public view returns (string[] memory) {

@@ -2,3 +2,6 @@
 
 # dependencies
 /.idea
+/authentication_images
+/registered_images
+/registration_images

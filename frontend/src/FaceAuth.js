@@ -1,6 +1,6 @@
 import faceIO from '@faceio/fiojs'
 
-const faceio = new faceIO('fioadb61');
+const faceio = new faceIO('fioa87e4');
 
   function enrollNewUser(){
     faceio.enroll({

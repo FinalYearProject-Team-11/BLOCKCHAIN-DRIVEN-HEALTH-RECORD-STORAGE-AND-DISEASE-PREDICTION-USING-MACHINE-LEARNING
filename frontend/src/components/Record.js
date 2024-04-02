@@ -13,7 +13,6 @@ import { create } from "ipfs-http-client";
 import Stack from '@mui/joy/Stack';
 import Add from '@mui/icons-material/Add';
 import InputFileUpload from './InputFileUpload';
-import { Input } from '@mui/joy';
 
 const Record = ({ isDoctor }) => {
     const [open, setOpen] = useState(false);
@@ -44,7 +43,7 @@ const Record = ({ isDoctor }) => {
                             data: encodedData,
                         }, 'latest');
                     
-                        const decodedResult = web3.eth.abi.decodeParameters(["address", "string", "int64", "string[]", "string[]"], result);
+                        const decodedResult = web3.eth.abi.decodeParameters(["address", "string", "int64", "string[]", "string[]", "string"], result);
 
                         console.log(decodedResult)
     
@@ -63,47 +62,47 @@ const Record = ({ isDoctor }) => {
                 }
             }
         })();
-    }, [record]); 
+    }, []); 
 
 
-    async function getPatient() {
-            try {
-                if (window.ethereum) {
-                    const web3 = new Web3(window.ethereum);
-                    await window.ethereum.request({ method: 'eth_requestAccounts' });
-                    const userAddress = web3.currentProvider.selectedAddress;
-                    const contractAddress = MyContractAddress;
+    // async function getPatient() {
+    //         try {
+    //             if (window.ethereum) {
+    //                 const web3 = new Web3(window.ethereum);
+    //                 await window.ethereum.request({ method: 'eth_requestAccounts' });
+    //                 const userAddress = web3.currentProvider.selectedAddress;
+    //                 const contractAddress = MyContractAddress;
                 
-                    const contractABI = getPatientABI;
+    //                 const contractABI = getPatientABI;
                 
-                    const contract = new web3.eth.Contract(contractABI, contractAddress);
+    //                 const contract = new web3.eth.Contract(contractABI, contractAddress);
                 
-                    const encodedData = contract.methods.getPatient(localStorage.getItem("Patient_id") ?? localStorage.getItem("PatientD_id")).encodeABI();
+    //                 const encodedData = contract.methods.getPatient(localStorage.getItem("Patient_id") ?? localStorage.getItem("PatientD_id")).encodeABI();
                 
-                    const result = await web3.eth.call({
-                        to: contractAddress,
-                        from: userAddress,
-                        data: encodedData,
-                    }, 'latest');
+    //                 const result = await web3.eth.call({
+    //                     to: contractAddress,
+    //                     from: userAddress,
+    //                     data: encodedData,
+    //                 }, 'latest');
                 
-                    const decodedResult = web3.eth.abi.decodeParameters(["address", "string", "int64", "string[]", "string[]"], result);
+    //                 const decodedResult = web3.eth.abi.decodeParameters(["address", "string", "int64", "string[]", "string[]"], result);
 
-                    console.log(decodedResult)
+    //                 console.log(decodedResult)
 
-                    if (decodedResult[3] !== null) {
-                        setRecord({
-                            name: decodedResult[3],
-                            hash: decodedResult[4]
-                        });
-                        console.log(record);
-                    }
-                } else {
-                    console.error('MetaMask is not installed or not enabled');
-                }
-            } catch (error) {
-                console.error('Error:', error);
-            }
-    }
+    //                 if (decodedResult[3] !== null) {
+    //                     setRecord({
+    //                         name: decodedResult[3],
+    //                         hash: decodedResult[4]
+    //                     });
+    //                     console.log(record);
+    //                 }
+    //             } else {
+    //                 console.error('MetaMask is not installed or not enabled');
+    //             }
+    //         } catch (error) {
+    //             console.error('Error:', error);
+    //         }
+    // }
 
     const ipfsClient = create({
         host: 'localhost',

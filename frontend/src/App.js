@@ -1,9 +1,8 @@
 import { Routes , Route } from 'react-router-dom';
 import 'bootstrap/dist/css/bootstrap.css'
 import 'bootstrap/dist/js/bootstrap.bundle.min.js';
-import 'jquery/dist/jquery.min.js'; // Import jQuery
-import 'popper.js/dist/umd/popper.min.js'; // Import Popper.js
-// import '@fontsource/inter';
+import 'jquery/dist/jquery.min.js'; 
+import 'popper.js/dist/umd/popper.min.js'; 
 import Landing from "./pages/Landing";
 import Patient from './pages/Patient';
 import Register from './pages/Register';

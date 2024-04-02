@@ -1,7 +1,7 @@
 
-const AdminContractAddress = '0xE2769DE49203414250b4711FeB60c5a99569c84A'
+const AdminContractAddress = '0xdE0519F00a4977b7726A71c480C77B9F410De795'
 
-const MyContractAddress = '0x45882FD52675Ad4d20FaA3498B0A9E415ff0ED99'
+const MyContractAddress = '0x100f985E16Ad678bbBdd48F1b9ED737d42d796Ac'
 
 const isAdminFunctionABI = [{
   "inputs": [],
@@ -454,11 +454,42 @@ const getPatientABI = [
       },
       {
         "internalType": "string[]",
+        "name": "recName",
+        "type": "string[]"
+      },
+      {
+        "internalType": "string[]",
         "name": "documentHash",
         "type": "string[]"
+      },
+      {
+        "internalType": "string",
+        "name": "summary",
+        "type": "string"
       }
     ],
     "stateMutability": "view",
+    "type": "function"
+  }
+]
+
+const addSummaryToPatientABI = [
+  {
+    "inputs": [
+      {
+        "internalType": "string",
+        "name": "patientID",
+        "type": "string"
+      },
+      {
+        "internalType": "string",
+        "name": "summary",
+        "type": "string"
+      }
+    ],
+    "name": "addSummaryToPatient",
+    "outputs": [],
+    "stateMutability": "nonpayable",
     "type": "function"
   }
 ]
@@ -474,7 +505,8 @@ export {
   getDiseaseABI,
   setDiseaseABI,
   addDocumentHashToPatientABI,
-  getPatientABI
+  getPatientABI,
+  addSummaryToPatientABI
 }
   
 

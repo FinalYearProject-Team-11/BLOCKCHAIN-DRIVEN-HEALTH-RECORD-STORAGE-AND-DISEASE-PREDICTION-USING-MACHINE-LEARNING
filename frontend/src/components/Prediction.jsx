@@ -2,8 +2,10 @@ import { useState, useEffect } from "react"
 import Web3 from "web3"
 import { Card, CardContent, Typography } from '@mui/material'
 import Button from "@mui/joy/Button";
-import { MyContractAddress, getParameterABI, getDiseaseABI, setDiseaseABI } from "../MyContractABI"
+import { MyContractAddress, getParameterABI, getDiseaseABI, setDiseaseABI, addSummaryToPatientABI, getPatientABI } from "../MyContractABI"
 import axios from "axios";
+import FormLabel from '@mui/joy/FormLabel';
+import TextField from '@mui/material/TextField';
 
 const Prediction = ({ isDoctor }) => {
     const [data, setData] = useState(null)
@@ -12,6 +14,7 @@ const Prediction = ({ isDoctor }) => {
     const [canPredictCardio, setCanPredictCardio] = useState(true)
     const [lungParameters, setLungParameters] = useState(null)
     const [cardioParameters, setCardioParameters] = useState(null)
+    const [summary, setSummary] = useState('')
     const lung_parameters = {
         "age": 0,
         "SMOKING": 0,
@@ -224,8 +227,45 @@ const Prediction = ({ isDoctor }) => {
                     console.error('Error:', error);
                 }
             })();
-        }
-    },[prediction])
+        };
+
+        (async function() {
+                try {
+                    if (window.ethereum) {
+                        const web3 = new Web3(window.ethereum);
+                        await window.ethereum.request({ method: 'eth_requestAccounts' });
+                        const userAddress = web3.currentProvider.selectedAddress;
+                        const contractAddress = MyContractAddress;
+                    
+                        const contractABI = getPatientABI;
+                    
+                        const contract = new web3.eth.Contract(contractABI, contractAddress);
+                    
+                        const encodedData = contract.methods.getPatient(localStorage.getItem("Patient_id") ?? localStorage.getItem("PatientD_id")).encodeABI();
+                    
+                        const result = await web3.eth.call({
+                            to: contractAddress,
+                            from: userAddress,
+                            data: encodedData,
+                        }, 'latest');
+                    
+                        const decodedResult = web3.eth.abi.decodeParameters(["address", "string", "int64", "string[]", "string[]", "string"], result);
+
+                        console.log(decodedResult)
+    
+                        if (decodedResult[3] !== null) {
+                            setSummary(decodedResult[5])
+                        }
+                    } else {
+                        console.error('MetaMask is not installed or not enabled');
+                    }
+                } catch (error) {
+                    console.error('Error:', error);
+                }
+            }
+        )();
+
+    },[prediction, summary])
 
     async function predict() {
         try {
@@ -277,6 +317,27 @@ const Prediction = ({ isDoctor }) => {
         }
     }
 
+    async function handleAddSummary(e) {
+        if (window.ethereum) {
+            const web3 = new Web3(window.ethereum);
+            await window.ethereum.request({ method: 'eth_requestAccounts' });
+            const userAddress = web3.currentProvider.selectedAddress
+            const contractAddress = MyContractAddress;                    
+            const contractABI = addSummaryToPatientABI;
+            const contract = new web3.eth.Contract(contractABI, contractAddress);        
+            const encodedData = contract.methods.addSummaryToPatient(localStorage.getItem("Patient_id") ?? localStorage.getItem("PatientD_id"), document.getElementById('summary').value).encodeABI();        
+            const tx = {
+                to: contractAddress,
+                from: userAddress,
+                data: encodedData,
+            };       
+            const receipt = await web3.eth.sendTransaction(tx);
+            console.log(receipt)
+        } else {
+            console.error('MetaMask is not installed or not enabled');
+        }
+    }
+
     return (
         <>
             <div style={{ backgroundColor: "white", borderRadius: '6px', padding: '8px', boxShadow: '0px 0px 4px 0px rgba(0,0,0,0.2)'  }} className="d-flex justify-content-between">
@@ -299,6 +360,36 @@ const Prediction = ({ isDoctor }) => {
                     </CardContent>
                   </Card>
                 ))}
+            </div>
+            <div style={{ marginBottom: '0px'}}> 
+                {isDoctor ? <TextField
+                  id="summary"
+                  multiline
+                  rows={4}
+                  defaultValue={summary}
+                  sx={{
+                    backgroundColor: 'white',
+                    marginTop: '10px',
+                    width: '100%'
+                  }}
+                />
+                :
+                <TextField
+                  id="summary"
+                  multiline
+                  rows={4}
+                  defaultValue={summary}
+                  sx={{
+                    backgroundColor: 'white',
+                    marginTop: '10px',
+                    width: '100%'
+                  }}
+                  disabled
+                />}
+               {isDoctor &&
+               <Button className="mt-3" type="submit" onClick={() => handleAddSummary()}>Add Summary</Button>
+               } 
+                
             </div>
         </>
     )
